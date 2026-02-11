@@ -95,6 +95,13 @@ function removePlayerFromAnyTeam(playerId) {
   }
 }
 
+function firstEmptyMemberIndex(team) {
+  for (let i = 0; i < MAX_MEMBER_SIZE; i += 1) {
+    if (!team.memberIds[i]) return i;
+  }
+  return -1;
+}
+
 function moveToCaptain(teamId, playerId) {
   const team = getTeam(teamId);
   const player = getPlayer(playerId);
@@ -110,22 +117,26 @@ function moveToCaptain(teamId, playerId) {
   rerenderAll();
 }
 
-function moveToMember(teamId, playerId, slotIndex) {
+function moveToMember(teamId, playerId, requestedIndex = null) {
   const team = getTeam(teamId);
   const player = getPlayer(playerId);
   if (!team || !player) return;
 
   if (team.memberIds.includes(playerId)) return;
-  if (slotIndex < 0 || slotIndex >= MAX_MEMBER_SIZE) return;
 
-  if (team.memberIds[slotIndex]) {
-    alert("That member slot is already filled.");
+  let slotIndex = typeof requestedIndex === "number" ? requestedIndex : firstEmptyMemberIndex(team);
+  if (slotIndex < 0 || slotIndex >= MAX_MEMBER_SIZE) {
+    alert("This team is already full (5 including captain).");
     return;
   }
 
-  if (team.memberIds.length >= MAX_MEMBER_SIZE) {
-    alert("This team is already full (5 including captain).");
-    return;
+  if (team.memberIds[slotIndex]) {
+    const fallback = firstEmptyMemberIndex(team);
+    if (fallback < 0) {
+      alert("This team is already full (5 including captain).");
+      return;
+    }
+    slotIndex = fallback;
   }
 
   removePlayerFromAnyTeam(playerId);
@@ -135,6 +146,13 @@ function moveToMember(teamId, playerId, slotIndex) {
   next[slotIndex] = playerId;
   team.memberIds = next.filter(Boolean);
 
+  rerenderAll();
+}
+
+function moveToUndrafted(playerId) {
+  const player = getPlayer(playerId);
+  if (!player) return;
+  removePlayerFromAnyTeam(playerId);
   rerenderAll();
 }
 
@@ -205,6 +223,8 @@ function renderUndrafted() {
   for (const player of players) {
     if (!drafted.has(player.id)) undraftedList.appendChild(renderPlayerCard(player));
   }
+
+  bindDropZone(undraftedList, moveToUndrafted);
 }
 
 function renderTeamCard(team) {
@@ -227,7 +247,12 @@ function renderTeamCard(team) {
     bindDropZone(captainSlot, (playerId) => moveToCaptain(team.id, playerId));
   }
 
+  const members = card.querySelector(".members");
   const membersList = card.querySelector(".members-list");
+  if (members) {
+    bindDropZone(members, (playerId) => moveToMember(team.id, playerId));
+  }
+
   if (membersList) {
     membersList.innerHTML = "";
 

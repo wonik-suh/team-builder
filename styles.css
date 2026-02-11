@@ -1,5 +1,5 @@
-/* --- base --- */
 * { box-sizing: border-box; }
+
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
@@ -10,7 +10,6 @@ body {
 h2 { margin: 0 0 10px; font-size: 16px; }
 p { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
 
-/* --- topbar --- */
 .topbar {
   height: 56px;
   display: flex;
@@ -18,12 +17,12 @@ p { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
   justify-content: space-between;
   padding: 0 16px;
   border-bottom: 1px solid #e5e7eb;
-  background: white;
+  background: #fff;
 }
+
 .brand { font-weight: 700; }
 .status { font-size: 12px; color: #6b7280; }
 
-/* --- 3-column layout --- */
 .layout {
   height: calc(100vh - 56px);
   display: grid;
@@ -32,15 +31,14 @@ p { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
   padding: 12px;
 }
 
-/* --- panels --- */
 .panel {
-  background: white;
+  background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  overflow: hidden; /* keeps inner scroll clean */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-width: 0; /* important for grid overflow */
+  min-width: 0;
 }
 
 .panel-section {
@@ -48,100 +46,169 @@ p { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
   border-bottom: 1px solid #f3f4f6;
 }
 
-.panel-section:last-child {
-  border-bottom: 0;
-}
+.panel-section:last-child { border-bottom: 0; }
 
-/* left */
-.left .undrafted {
+.left .undrafted,
+.right .settings {
   flex: 1;
   min-height: 0;
 }
 
-/* center */
 .center .center-header {
   padding: 12px;
   border-bottom: 1px solid #f3f4f6;
 }
+
 .center #teamsGrid {
   flex: 1;
   min-height: 0;
   padding: 12px;
   overflow: auto;
 }
+
 .center #teamsEmpty {
   padding: 12px;
   color: #6b7280;
   font-size: 12px;
 }
 
-/* right */
-.right .settings {
-  flex: 1;
-  min-height: 0;
-}
 .actions {
   display: flex;
   gap: 8px;
   margin: 8px 0 12px;
 }
-.actions button {
-  flex: 1;
-}
 
-/* form basics */
-input, select, button {
-  font: inherit;
-}
-#addForm input, #addForm select {
-  width: 100%;
-  margin-bottom: 8px;
-  padding: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: white;
-}
-#addLanes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
+.actions button { flex: 1; }
+
+input, select, button { font: inherit; }
+
 button {
   padding: 8px 10px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  background: #ffffff;
+  background: #fff;
   cursor: pointer;
 }
-button:hover {
-  background: #f9fafb;
-}
 
-/* lists (undrafted) */
+button:hover { background: #f9fafb; }
+
 #undraftedList {
   overflow: auto;
   max-height: 100%;
-  border-top: 1px solid #f3f4f6;
-  padding-top: 10px;
+  border: 1px dashed transparent;
+  border-radius: 10px;
+  padding: 8px;
 }
 
-/* just for visibility right now */
-.field { margin-top: 12px; }
-.field label { display: block; font-size: 12px; color: #374151; margin-bottom: 6px; }
-/* player card basics */
+#undraftedList.drop-active {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+#teamsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.team-card {
+  position: relative;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  min-height: 430px;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.team-remove:hover { color: #374151; }
+
+.captain-wrap {
+  background: #f3f4f6;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.captain-slot {
+  min-height: 72px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #cbd5e1;
+  color: #94a3b8;
+  font-size: 12px;
+  background: #fff;
+}
+
+.captain-slot:not(.is-empty) {
+  border: 1px solid transparent;
+  color: inherit;
+}
+
+.members {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.members-list {
+  display: grid;
+  grid-template-rows: repeat(4, minmax(72px, 1fr));
+  gap: 8px;
+  height: 100%;
+}
+
+.member-slot {
+  min-height: 72px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.member-slot.is-empty {
+  border: 1px dashed #e5e7eb;
+  background: #fafafa;
+  color: #94a3b8;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.members.drop-active,
+.member-slot.drop-active,
+.captain-slot.drop-active {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
 .player-card {
   display: flex;
+  align-items: center;
   gap: 10px;
+  min-height: 72px;
   padding: 10px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #ffffff;
-  margin-bottom: 8px;
+  background: #fff;
+  margin-bottom: 0;
+  color: #111827;
 }
 
-/* avatar placeholder */
+.player-card.dragging { opacity: 0.55; }
+
 .player-card .avatar {
   width: 36px;
   height: 36px;
@@ -155,10 +222,9 @@ button:hover {
   flex-shrink: 0;
 }
 
-/* info block */
 .player-card .info {
   flex: 1;
-  min-width: 0; /* 중요: 텍스트 넘침 제어 */
+  min-width: 0;
 }
 
 .player-card .row {
@@ -169,6 +235,7 @@ button:hover {
 }
 
 .player-card .name {
+  color: #111827;
   font-weight: 600;
   font-size: 14px;
   white-space: nowrap;
@@ -176,117 +243,14 @@ button:hover {
   text-overflow: ellipsis;
 }
 
-/* tags */
-.player-card .tags {
-  margin-top: 4px;
-  display: flex;
-  gap: 6px;
-  font-size: 11px;
-}
+.player-card .subrow { margin-top: 4px; }
 
-.player-card .tier,
 .player-card .lanes {
   padding: 2px 6px;
   border-radius: 6px;
   background: #f3f4f6;
-  white-space: nowrap;      /* 한 줄 고정 */
-  overflow: hidden;
-  text-overflow: ellipsis;  /* 길면 ... */
-}
-/* --- teams grid layout --- */
-#teamsGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(320px, 1fr));
-  gap: 12px;
-}
-
-/* --- team card --- */
-.team-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #ffffff;
-  padding: 12px;
-}
-
-.team-card header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.team-card header strong {
-  font-size: 14px;
-}
-
-.team-card header button {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-}
-
-/* --- captain slot --- */
-.captain-slot {
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
-  padding: 10px;
-  margin-bottom: 10px;
-  background: #f8fafc;
-  min-height: 64px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* when captain slot contains a player-card, make it full width */
-.captain-slot .player-card {
-  width: 100%;
-  margin-bottom: 0;
-}
-
-/* --- members list (4x1) --- */
-.members {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-
-.member-slot {
-  border: 1px dashed #e5e7eb;
-  border-radius: 12px;
-  padding: 8px;
-  background: #ffffff;
-  min-height: 64px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* if slot contains a player card, let it fill */
-.member-slot .player-card {
-  width: 100%;
-  margin-bottom: 0;
-}
-/* --- members list (4x1) --- */
-.members {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.player-card {
-  align-items: center;
-}
-
-.player-card .info {
-  flex: 1;
-  min-width: 0;
-}
-
-.player-card .subrow {
-  margin-top: 4px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .tier-badge {
@@ -295,135 +259,9 @@ button:hover {
   padding: 6px 10px;
   border-radius: 999px;
   background: #f3f4f6;
-  white-space: nowrap;
   margin-left: 10px;
 }
-/* =========================
-   Team: captain slot becomes the captain "card"
-   Dashed border ONLY when empty
-========================= */
 
-.team-card {
-  position: relative;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: #ffffff;
-  padding: 0;
-  overflow: hidden;
-}
-
-/* subtle X */
-.team-remove {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  color: #9ca3af;
-  cursor: pointer;
-}
-.team-remove:hover { color: #374151; }
-
-/* captain area background should NOT be the "strong" highlight */
-.captain-wrap {
-  background: #f3f4f6;          /* 은은한 회색만 */
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-/* captain slot becomes the visual container */
-.captain-slot {
-  border: none;                 /* 기본: 테두리 없음 */
-  border-radius: 12px;
-  padding: 10px;                /* 슬롯 자체가 카드가 되게 */
-  background: #ffffff;
-}
-
-/* ONLY empty captain slot shows dashed */
-.captain-slot.is-empty {
-  border: 2px dashed #cbd5e1;
-  background: #ffffff;
-  color: #94a3b8;
-  font-size: 12px;
-  text-align: center;
-}
-
-/* captain player-card should "melt into" the slot */
-.captain-slot .player-card {
-  border: none;
-  background: transparent;
-  padding: 0;
-  margin: 0;
-}
-
-/* members list */
-.members {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-}
-
-/* member slots: no extra framing when filled */
-.member-slot {
-  padding: 0;
-  border: none;
-  background: transparent;
-}
-
-/* empty member slots show dashed drop box */
-.member-slot.is-empty {
-  border: 1px dashed #e5e7eb;
-  border-radius: 10px;
-  padding: 12px;
-  background: #fafafa;
-  color: #94a3b8;
-  font-size: 12px;
-  text-align: center;
-}
-
-/* IMPORTANT: fix "faded" cards caused by inherited gray color from parent */
-.player-card {
-  color: #111827;
-}
-.player-card .name {
-  color: #111827;
-}
-/* members area: list + single dropzone */
-.members {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-}
-
-.members-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* each member row holds a full card */
-.member-row .player-card {
-  width: 100%;
-  margin-bottom: 0;
-}
-
-/* single dropzone at bottom */
-.member-dropzone {
-  border: 1px dashed #e5e7eb;
-  border-radius: 10px;
-  padding: 12px;
-  background: #fafafa;
-  color: #94a3b8;
-  font-size: 12px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-/* panel header with + button */
 .panel-header {
   display: flex;
   align-items: center;
@@ -438,7 +276,6 @@ button:hover {
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   background: #fff;
-  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -450,9 +287,9 @@ button:hover {
   background: transparent;
   color: #9ca3af;
 }
+
 .icon-btn.subtle:hover { color: #374151; }
 
-/* modal */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -464,14 +301,12 @@ button:hover {
   z-index: 9999;
 }
 
-.modal-backdrop.open {
-  display: flex;
-}
+.modal-backdrop.open { display: flex; }
 
 .modal {
   width: min(520px, 100%);
   border-radius: 14px;
-  background: #ffffff;
+  background: #fff;
   border: 1px solid #e5e7eb;
   box-shadow: 0 10px 30px rgba(0,0,0,0.15);
   overflow: hidden;
@@ -529,64 +364,4 @@ button:hover {
   border: 1px solid #e5e7eb;
   background: #111827;
   color: #fff;
-  cursor: pointer;
-}
-
-/* --- team card sizing + fixed 5-slot layout (captain 1 + members 4) --- */
-.team-card {
-  min-height: 500px;
-  display: flex;
-  flex-direction: column;
-}
-
-.members-list {
-  display: grid;
-  grid-template-rows: repeat(4, minmax(72px, auto));
-  gap: 8px;
-}
-
-.member-slot {
-  border: 1px solid transparent;
-  border-radius: 10px;
-  min-height: 72px;
-}
-
-.member-slot .player-card {
-  width: 100%;
-  margin-bottom: 0;
-}
-
-.member-slot.is-empty {
-  border: 1px dashed #e5e7eb;
-  background: #fafafa;
-  color: #94a3b8;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* captain drop box always visible */
-.captain-slot {
-  min-height: 72px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.captain-slot.is-empty {
-  border: 2px dashed #cbd5e1;
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-/* drag feedback */
-.player-card.dragging {
-  opacity: 0.55;
-}
-
-.captain-slot.drop-active,
-.member-slot.drop-active {
-  border-color: #60a5fa;
-  background: #eff6ff;
 }
