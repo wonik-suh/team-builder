@@ -4,6 +4,7 @@ const undraftedList = document.getElementById("undraftedList");
 const teamsGrid = document.getElementById("teamsGrid");
 const teamsEmpty = document.getElementById("teamsEmpty");
 const pickOrderList = document.getElementById("pickOrderList");
+const statusText = document.getElementById("statusText");
 
 const playerTpl = document.getElementById("playerCardTpl");
 const teamTpl = document.getElementById("teamCardTpl");
@@ -39,8 +40,8 @@ const players = [
   { id: "p6",  name: "Lightstinger",tier: "Diamond",  lanes: ["Top"] },
   { id: "p7",  name: "Thrallson",   tier: "Platinum", lanes: ["Jungle"] },
   { id: "p8",  name: "Sylvanis",    tier: "Diamond",  lanes: ["Mid"] },
-  { id: "p9",  name: "Stormclaw",   tier: "Platinum", lanes: ["ADC"] },
-  { id: "p10", name: "Frostwhisper",tier: "Gold",     lanes: ["Support"] },
+  { id: "p13", name: "Aetherion",   tier: "Platinum", lanes: ["ADC"] },
+  { id: "p14", name: "Moonward",    tier: "Gold",     lanes: ["Support"] },
   { id: "p11", name: "Doomhammer",  tier: "Grandmaster", lanes: ["Jungle"] },
   { id: "p12", name: "Brightye",    tier: "Master",   lanes: ["Mid"] },
 ];
@@ -50,12 +51,12 @@ const teams = [
   {
     id: "t1",
     captainId: "p11",
-    memberIds: ["p12", "p1", "p3", "p5"], // 4 members
+    memberIds: ["p12", "p2", "p4", "p5"], // 4 members
   },
   {
     id: "t2",
     captainId: "p6",
-    memberIds: ["p7", "p8", "p9", "p10"],
+    memberIds: ["p7", "p8", "p13", "p14"],
   },
 ];
 
@@ -200,7 +201,7 @@ if (dropzone) {
 
 
   // optional: remove button demo
-  const removeBtn = card.querySelector("header button");
+  const removeBtn = card.querySelector(".team-remove");
   if (removeBtn) {
     removeBtn.type = "button";
     removeBtn.addEventListener("click", () => {
@@ -287,4 +288,10 @@ function rerenderAll() {
   renderUndrafted();
   renderTeams();
   renderPickOrder();
+
+  if (statusText) {
+    statusText.textContent = `Ready · ${teams.length} teams · ${players.length} players`;
+  }
 }
+
+rerenderAll();
