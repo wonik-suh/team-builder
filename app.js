@@ -1,402 +1,985 @@
-const undraftedList = document.getElementById("undraftedList");
-const teamsGrid = document.getElementById("teamsGrid");
-const teamsEmpty = document.getElementById("teamsEmpty");
-const pickOrderList = document.getElementById("pickOrderList");
-const statusText = document.getElementById("statusText");
+// =====================
+// Helpers
+// =====================
+function uid() {
+  return Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+function initials(name) {
+  const parts = name.trim().split(/\s+/);
+  const a = parts[0]?.[0] ?? "?";
+  const b = parts[1]?.[0] ?? "";
+  return (a + b).toUpperCase();
+}
+function hashHue(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+function tierClass(tier) {
+  const t = String(tier || "").toLowerCase();
+  return "t-" + t.replace(/\s+/g, "");
+}
+function lanesToText(lanes) {
+  if (!lanes || lanes.length === 0) return "—";
+  const set = new Set(lanes.map(x => String(x).toUpperCase()));
+  const required = ["TOP", "JGL", "MID", "ADC", "SUP"];
+  if (required.every(x => set.has(x))) return "ALL";
+  if (lanes.length === 1) return lanes[0];
+  return lanes.join("/");
+}
 
-const playerTpl = document.getElementById("playerCardTpl");
-const teamTpl = document.getElementById("teamCardTpl");
+// ✅ N팀 스네이크: 0..N-1..0
+function buildSnakeSeq(n) {
+  if (n <= 1) return [0];
+  const up = Array.from({ length: n }, (_, i) => i);
+  const down = Array.from({ length: n }, (_, i) => n - 1 - i);
+  return up.concat(down);
+}
 
-const addParticipantBtn = document.getElementById("addParticipantBtn");
-const playerModal = document.getElementById("playerModal");
-const playerModalClose = document.getElementById("playerModalClose");
-const playerModalSave = document.getElementById("playerModalSave");
-const modalTitle = document.getElementById("playerModalTitle");
-const modalName = document.getElementById("modalName");
-const modalTier = document.getElementById("modalTier");
+// =====================
+// Parsing helpers (PASTE HERE)
+// =====================
+const LANE_KO_MAP = new Map([
+  ["탑", "TOP"], ["top", "TOP"],
+  ["정글", "JGL"], ["정글러", "JGL"], ["jg", "JGL"], ["jgl", "JGL"], ["jungle", "JGL"],
+  ["미드", "MID"], ["mid", "MID"],
+  ["원딜", "ADC"], ["adc", "ADC"], ["바텀", "ADC"], ["봇", "ADC"], ["bot", "ADC"],
+  ["서폿", "SUP"], ["서포터", "SUP"], ["서포트", "SUP"], ["sup", "SUP"], ["support", "SUP"]
+]);
 
-const MAX_TEAM_SIZE = 5;
-const MAX_MEMBER_SIZE = MAX_TEAM_SIZE - 1;
+const TIER_KO_MAP = new Map([
+  ["아이언", "Iron"], ["iron", "Iron"],
+  ["브론즈", "Bronze"], ["bronze", "Bronze"],
+  ["실버", "Silver"], ["silver", "Silver"],
+  ["골드", "Gold"], ["gold", "Gold"],
+  // ✅ 플레티넘 = Platinum
+  ["플레", "Platinum"], ["플래", "Platinum"], ["플래티넘", "Platinum"], ["플레티넘", "Platinum"], ["platinum", "Platinum"],
+  ["에메", "Emerald"], ["에메랄드", "Emerald"], ["emerald", "Emerald"],
+  ["다이아", "Diamond"], ["다이아몬드", "Diamond"], ["diamond", "Diamond"],
+  ["마스터", "Master"], ["master", "Master"],
+  ["그마", "Grandmaster"], ["그랜드마스터", "Grandmaster"], ["grandmaster", "Grandmaster"],
+  ["챌", "Challenger"], ["챌린저", "Challenger"], ["challenger", "Challenger"],
+]);
 
-const LANE_ABBR = {
-  Top: "TOP",
-  Jungle: "JGL",
-  Mid: "MID",
-  ADC: "ADC",
-  Support: "SUP",
+const TIER_ORDER_HIGH_TO_LOW = [
+  "Challenger",
+  "Grandmaster",
+  "Master",
+  "Diamond",
+  "Emerald",
+  "Platinum",
+  "Gold",
+  "Silver",
+  "Bronze",
+  "Iron",
+];
+
+function tierRank(tier) {
+  const t = String(tier ?? "").trim();
+  const idx = TIER_ORDER_HIGH_TO_LOW.indexOf(t);
+  return idx === -1 ? 999 : idx; // unknown = 맨 아래
+}
+
+function normalizeTier(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "Gold";
+  const key = s.toLowerCase().replace(/\s+/g, "");
+  for (const [k, v] of TIER_KO_MAP.entries()) {
+    if (key === String(k).toLowerCase().replace(/\s+/g, "")) return v;
+  }
+  const english = ["Iron","Bronze","Silver","Gold","Platinum","Emerald","Diamond","Master","Grandmaster","Challenger"];
+  const found = english.find(t => t.toLowerCase() === key);
+  return found ?? s;
+}
+
+function parseLanes(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return ["—"];
+
+  const key = s.toLowerCase().replace(/\s+/g, "");
+  if (key === "all" || key === "올" || key === "전체") {
+    return ["TOP","JGL","MID","ADC","SUP"];
+  }
+
+  const tokens = s
+    .split(/[,\|\/\+\&\s]+/g)
+    .map(t => t.trim())
+    .filter(Boolean);
+
+  const lanes = [];
+  for (const tok of tokens) {
+    const k = tok.toLowerCase().replace(/\s+/g, "");
+    let mapped = null;
+    for (const [mk, mv] of LANE_KO_MAP.entries()) {
+      if (k === String(mk).toLowerCase().replace(/\s+/g, "")) {
+        mapped = mv;
+        break;
+      }
+    }
+    lanes.push(mapped ?? tok);
+  }
+
+  const set = new Set(lanes.map(x => String(x).toUpperCase()));
+  const required = ["TOP", "JGL", "MID", "ADC", "SUP"];
+  if (required.every(x => set.has(x))) return required;
+
+  return lanes.map(x => {
+    const u = String(x).toUpperCase();
+    if (["TOP","JGL","MID","ADC","SUP"].includes(u)) return u;
+    return String(x);
+  });
+}
+
+function parsePasteText(text) {
+  const lines = String(text ?? "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  const created = [];
+  for (const line of lines) {
+    const parts = line.split("/").map(x => x.trim());
+    const name = parts[0] ?? "";
+    const tierRaw = parts[1] ?? "";
+    const laneRaw = parts[2] ?? "";
+
+    if (!name) continue;
+
+    const tier = normalizeTier(tierRaw);
+    const lanes = parseLanes(laneRaw);
+
+    created.push({ id: uid(), name, lanes, tier });
+  }
+  return created;
+}
+
+// =====================
+// Export helpers (Korean copy)
+// =====================
+function tierToKorean(tier) {
+  const t = String(tier ?? "").trim().toLowerCase();
+
+  if (t === "iron") return "아이언";
+  if (t === "bronze") return "브론즈";
+  if (t === "silver") return "실버";
+  if (t === "gold") return "골드";
+  if (t === "platinum") return "플레티넘";
+  if (t === "emerald") return "에메랄드";
+  if (t === "diamond") return "다이아";
+  if (t === "master") return "마스터";
+  if (t === "grandmaster") return "그마";
+  if (t === "challenger") return "챌";
+
+  // 애매하면 원문 그대로
+  return String(tier ?? "");
+}
+
+function laneTokenToKorean(tok) {
+  const u = String(tok ?? "").toUpperCase().trim();
+  if (u === "TOP") return "탑";
+  if (u === "JGL") return "정글";
+  if (u === "MID") return "미드";
+  if (u === "ADC") return "원딜";
+  if (u === "SUP") return "서폿";
+  if (u === "ALL") return "ALL";
+  return String(tok ?? "");
+}
+function lanesToKoreanText(lanes) {
+  const t = lanesToText(lanes);
+  if (t === "ALL") return "ALL";
+  if (!t || t === "—") return "—";
+
+  // 기존 join("/") → join(", ")
+  return t.split("/").map(laneTokenToKorean).join(", ");
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // fallback
+    window.prompt("복사하세요:", text);
+  }
+}
+
+// =====================
+// State (✅ 기본 더미 카드 삭제)
+// =====================
+const state = {
+  participants: [], // ✅ empty by default
+  teams: [],        // { id, captainId, slots:[pid|null] }
+  teamOrder: [],    // pick order list of teamIds
+  draft: {
+    active: false,
+    turn: 0,
+  }
 };
 
-const players = [
-  { id: "p2", name: "Shadowmend", tier: "Platinum", lanes: ["Mid", "Support"] },
-  { id: "p4", name: "Ravencrest", tier: "Diamond", lanes: ["Jungle", "Mid"] },
-  { id: "p5", name: "Bladefist", tier: "Platinum", lanes: ["Top", "Jungle"] },
-  { id: "p9", name: "Stormclaw", tier: "Platinum", lanes: ["ADC", "Support"] },
-  { id: "p10", name: "Frostwhisper", tier: "Gold", lanes: [] },
-  { id: "p6", name: "Lightstinger", tier: "Diamond", lanes: ["Top"] },
-  { id: "p7", name: "Thrallson", tier: "Platinum", lanes: ["Jungle"] },
-  { id: "p8", name: "Sylvanis", tier: "Diamond", lanes: ["Mid"] },
-  { id: "p13", name: "Aetherion", tier: "Platinum", lanes: ["ADC"] },
-  { id: "p14", name: "Moonward", tier: "Gold", lanes: ["Support"] },
-  { id: "p11", name: "Doomhammer", tier: "Grandmaster", lanes: ["Jungle"] },
-  { id: "p12", name: "Brightye", tier: "Master", lanes: ["Mid"] },
-];
+// =====================
+// DOM
+// =====================
+const participantsList = document.getElementById("participantsList");
+const totalCount = document.getElementById("totalCount");
+const draftStatePill = document.getElementById("draftStatePill");
+const pasteZone = document.getElementById("pasteZone");
 
-const teams = [
-  { id: "t1", captainId: "p11", memberIds: ["p12", "p2", "p4", "p5"] },
-  { id: "t2", captainId: "p6", memberIds: ["p7", "p8", "p13"] },
-];
+const captainDropZone = document.getElementById("captainDropZone");
+const teamsGrid = document.getElementById("teamsGrid");
+const pickOrder = document.getElementById("pickOrder");
 
-let editingPlayerId = null;
+const btnToggleDraftTop = document.getElementById("btnToggleDraftTop");
+const btnToggleDraftBottom = document.getElementById("btnToggleDraftBottom");
+const btnCopyKorean = document.getElementById("btnCopyKorean");
 
-const modalLaneChecks = () =>
-  playerModal ? Array.from(playerModal.querySelectorAll('.checks input[type="checkbox"]')) : [];
+// Add modal
+const modalBackdrop = document.getElementById("modalBackdrop");
+const btnOpenAdd = document.getElementById("btnOpenAdd");
+const btnCloseAdd = document.getElementById("btnCloseAdd");
+const btnCancelAdd = document.getElementById("btnCancelAdd");
+const addForm = document.getElementById("addForm");
+const inpName = document.getElementById("inpName");
+const inpTier = document.getElementById("inpTier");
+const laneGrid = document.getElementById("laneGrid");
 
-function getPlayer(playerId) {
-  return players.find((player) => player.id === playerId) || null;
+// =====================
+// Derived
+// =====================
+function getParticipant(pid) {
+  return state.participants.find(p => p.id === pid);
 }
 
-function getTeam(teamId) {
-  return teams.find((team) => team.id === teamId) || null;
-}
-
-function lanesLabel(lanes) {
-  if (!Array.isArray(lanes) || lanes.length === 0) return "ALL";
-  const unique = Array.from(new Set(lanes));
-  if (unique.length >= 5) return "ALL";
-  return unique.map((lane) => LANE_ABBR[lane] || lane).join(" ");
-}
-
-function initials(name) {
-  if (!name) return "??";
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function findPlayerAssignment(playerId) {
-  for (const team of teams) {
-    if (team.captainId === playerId) return { team, role: "captain" };
-
-    const memberIndex = team.memberIds.indexOf(playerId);
-    if (memberIndex >= 0) return { team, role: "member", memberIndex };
+function isPicked(pid) {
+  for (const t of state.teams) {
+    if (t.captainId === pid) return true;
+    if (t.slots.includes(pid)) return true;
   }
-
-  return null;
+  return false;
 }
 
-function removePlayerFromAnyTeam(playerId) {
-  const assignment = findPlayerAssignment(playerId);
-  if (!assignment) return;
-
-  if (assignment.role === "captain") {
-    assignment.team.captainId = null;
-  } else {
-    assignment.team.memberIds.splice(assignment.memberIndex, 1);
+function allSlotsFilled() {
+  if (state.teams.length === 0) return false;
+  for (const t of state.teams) {
+    if (t.slots.some(x => x === null)) return false;
   }
+  return true;
 }
 
-function firstEmptyMemberIndex(team) {
-  for (let i = 0; i < MAX_MEMBER_SIZE; i += 1) {
-    if (!team.memberIds[i]) return i;
-  }
-  return -1;
+function getActiveTeamId() {
+  if (!state.draft.active) return null;
+  const n = state.teamOrder.length;
+  if (n === 0) return null;
+
+  const seq = buildSnakeSeq(n);
+  const idx = seq[state.draft.turn % seq.length];
+  return state.teamOrder[idx];
 }
 
-function moveToCaptain(teamId, playerId) {
-  const team = getTeam(teamId);
-  const player = getPlayer(playerId);
-  if (!team || !player) return;
+// =====================
+// Draft toggle + auto-end
+// =====================
+function setDraftActive(on) {
+  state.draft.active = on;
+  if (on) state.draft.turn = 0;
 
-  if (team.captainId && team.captainId !== playerId) {
-    alert("Captain slot is already filled.");
+  btnToggleDraftTop.textContent = on ? "End Draft" : "Start Draft";
+  btnToggleDraftBottom.textContent = on ? "End Draft" : "Start Draft";
+  draftStatePill.textContent = on ? "Draft: ON" : "Draft: Off";
+}
+
+function maybeAutoEndDraft() {
+  if (!state.draft.active) return;
+  if (allSlotsFilled()) setDraftActive(false);
+}
+
+// =====================
+// Render
+// =====================
+function render() {
+  renderParticipants();
+  renderTeams();
+  renderPickOrder();
+  maybeAutoEndDraft();
+}
+
+function renderParticipants() {
+  // ✅ 팀 섹션에 들어간 순간(팀장/팀원) 리스트에서 제거
+  // ✅ 항상 티어순(높→낮) 자동정렬
+  const list = state.participants
+    .filter(p => !isPicked(p.id))
+    .sort((a, b) => {
+      const ra = tierRank(a.tier);
+      const rb = tierRank(b.tier);
+      if (ra !== rb) return ra - rb;
+      return a.name.localeCompare(b.name, "ko");
+    });
+
+  totalCount.textContent = `${list.length} available`;
+
+  participantsList.innerHTML = "";
+  if (list.length === 0) {
+    participantsList.innerHTML = `<div class="mutedText small" style="padding:10px 6px;">No available players.</div>`;
     return;
   }
-
-  removePlayerFromAnyTeam(playerId);
-  team.captainId = playerId;
-  rerenderAll();
-}
-
-function moveToMember(teamId, playerId, requestedIndex = null) {
-  const team = getTeam(teamId);
-  const player = getPlayer(playerId);
-  if (!team || !player) return;
-
-  if (team.memberIds.includes(playerId)) return;
-
-  let slotIndex = typeof requestedIndex === "number" ? requestedIndex : firstEmptyMemberIndex(team);
-  if (slotIndex < 0 || slotIndex >= MAX_MEMBER_SIZE) {
-    alert("This team is already full (5 including captain).");
-    return;
+  for (const p of list) {
+    participantsList.appendChild(participantCard(p));
   }
-
-  if (team.memberIds[slotIndex]) {
-    const fallback = firstEmptyMemberIndex(team);
-    if (fallback < 0) {
-      alert("This team is already full (5 including captain).");
-      return;
-    }
-    slotIndex = fallback;
-  }
-
-  removePlayerFromAnyTeam(playerId);
-
-  const next = new Array(MAX_MEMBER_SIZE).fill(null);
-  for (let i = 0; i < MAX_MEMBER_SIZE; i += 1) next[i] = team.memberIds[i] || null;
-  next[slotIndex] = playerId;
-  team.memberIds = next.filter(Boolean);
-
-  rerenderAll();
-}
-
-function moveToUndrafted(playerId) {
-  const player = getPlayer(playerId);
-  if (!player) return;
-  removePlayerFromAnyTeam(playerId);
-  rerenderAll();
-}
-
-function bindDropZone(zone, onDrop) {
-  zone.addEventListener("dragover", (event) => {
-    event.preventDefault();
-    zone.classList.add("drop-active");
-  });
-
-  zone.addEventListener("dragleave", () => {
-    zone.classList.remove("drop-active");
-  });
-
-  zone.addEventListener("drop", (event) => {
-    event.preventDefault();
-    zone.classList.remove("drop-active");
-    const playerId = event.dataTransfer?.getData("text/plain");
-    if (!playerId) return;
-    onDrop(playerId);
-  });
-}
-
-function renderPlayerCard(player) {
-  const node = playerTpl.content.firstElementChild.cloneNode(true);
-  node.dataset.playerId = player.id;
-  node.draggable = true;
-
-  const avatar = node.querySelector(".avatar");
-  const nameEl = node.querySelector(".name");
-  const tierEl = node.querySelector(".tier-badge");
-  const lanesEl = node.querySelector(".lanes");
-
-  if (avatar) avatar.textContent = initials(player.name);
-  if (nameEl) nameEl.textContent = player.name;
-  if (tierEl) tierEl.textContent = player.tier ?? "UNRANKED";
-  if (lanesEl) lanesEl.textContent = lanesLabel(player.lanes);
-
-  node.addEventListener("dragstart", (event) => {
-    event.dataTransfer?.setData("text/plain", player.id);
-    event.dataTransfer.effectAllowed = "move";
-    node.classList.add("dragging");
-  });
-
-  node.addEventListener("dragend", () => {
-    node.classList.remove("dragging");
-  });
-
-  const editBtn = node.querySelector(".edit");
-  if (editBtn) {
-    editBtn.type = "button";
-    editBtn.addEventListener("click", () => {
-      openPlayerModal({ mode: "edit", player });
-    });
-  }
-
-  return node;
-}
-
-function renderUndrafted() {
-  undraftedList.innerHTML = "";
-
-  const drafted = new Set();
-  for (const team of teams) {
-    if (team.captainId) drafted.add(team.captainId);
-    for (const memberId of team.memberIds) drafted.add(memberId);
-  }
-
-  for (const player of players) {
-    if (!drafted.has(player.id)) undraftedList.appendChild(renderPlayerCard(player));
-  }
-
-  bindDropZone(undraftedList, moveToUndrafted);
-}
-
-function renderTeamCard(team) {
-  const card = teamTpl.content.firstElementChild.cloneNode(true);
-  card.dataset.teamId = team.id;
-
-  const captainSlot = card.querySelector(".captain-slot");
-  const captain = team.captainId ? getPlayer(team.captainId) : null;
-
-  if (captainSlot) {
-    captainSlot.innerHTML = "";
-    captainSlot.classList.toggle("is-empty", !captain);
-
-    if (captain) {
-      captainSlot.appendChild(renderPlayerCard(captain));
-    } else {
-      captainSlot.textContent = "Drop captain here";
-    }
-
-    bindDropZone(captainSlot, (playerId) => moveToCaptain(team.id, playerId));
-  }
-
-  const members = card.querySelector(".members");
-  const membersList = card.querySelector(".members-list");
-  if (members) {
-    bindDropZone(members, (playerId) => moveToMember(team.id, playerId));
-  }
-
-  if (membersList) {
-    membersList.innerHTML = "";
-
-    for (let i = 0; i < MAX_MEMBER_SIZE; i += 1) {
-      const slot = document.createElement("div");
-      slot.className = "member-slot";
-
-      const memberId = team.memberIds[i];
-      const member = memberId ? getPlayer(memberId) : null;
-
-      if (member) {
-        slot.appendChild(renderPlayerCard(member));
-      } else {
-        slot.classList.add("is-empty");
-        slot.textContent = "Drop member here";
-      }
-
-      bindDropZone(slot, (playerId) => moveToMember(team.id, playerId, i));
-      membersList.appendChild(slot);
-    }
-  }
-
-  const removeBtn = card.querySelector(".team-remove");
-  if (removeBtn) {
-    removeBtn.type = "button";
-    removeBtn.addEventListener("click", () => {
-      alert(`(Demo) Remove team ${team.id}`);
-    });
-  }
-
-  return card;
 }
 
 function renderTeams() {
   teamsGrid.innerHTML = "";
+  const activeTeamId = getActiveTeamId();
 
-  if (teams.length === 0) {
-    teamsEmpty.style.display = "block";
-    return;
+  for (const teamId of state.teamOrder) {
+    const team = state.teams.find(t => t.id === teamId);
+    if (!team) continue;
+
+    const card = teamCard(team, activeTeamId);
+    teamsGrid.appendChild(card);
   }
-
-  teamsEmpty.style.display = "none";
-  for (const team of teams) teamsGrid.appendChild(renderTeamCard(team));
 }
 
 function renderPickOrder() {
-  pickOrderList.innerHTML = "";
-  for (const team of teams) {
-    const captain = team.captainId ? getPlayer(team.captainId) : null;
-    const row = document.createElement("div");
-    row.style.fontSize = "12px";
-    row.style.padding = "6px 0";
-    row.textContent = captain ? captain.name : "(No captain)";
-    pickOrderList.appendChild(row);
+  pickOrder.innerHTML = "";
+
+  if (state.teamOrder.length === 0) {
+    pickOrder.innerHTML = `<div class="mutedText small">Create teams by dropping captains first.</div>`;
+    return;
+  }
+
+  const activeTeamId = getActiveTeamId();
+  for (const teamId of state.teamOrder) {
+    const team = state.teams.find(t => t.id === teamId);
+    if (!team) continue;
+    pickOrder.appendChild(pickRow(team, activeTeamId));
   }
 }
 
-function openPlayerModal({ mode, player } = {}) {
-  if (!playerModal || !modalTitle || !modalName || !modalTier) return;
-
-  editingPlayerId = mode === "edit" ? player.id : null;
-  modalTitle.textContent = "Player";
-  modalName.value = player?.name ?? "";
-  modalTier.value = player?.tier ?? "UNRANKED";
-
-  const selected = new Set(player?.lanes ?? []);
-  for (const checkbox of modalLaneChecks()) checkbox.checked = selected.has(checkbox.value);
-
-  playerModal.classList.add("open");
-  playerModal.setAttribute("aria-hidden", "false");
-  setTimeout(() => modalName.focus(), 0);
+// =====================
+// UI Components
+// =====================
+function avatarEl(name) {
+  const a = document.createElement("div");
+  a.className = "avatar";
+  a.textContent = initials(name);
+  a.style.background = `hsl(${hashHue(name)} 70% 55%)`;
+  return a;
 }
 
-function closePlayerModal() {
-  if (!playerModal) return;
-  playerModal.classList.remove("open");
-  playerModal.setAttribute("aria-hidden", "true");
-  editingPlayerId = null;
-}
+function participantCard(p) {
+  const card = document.createElement("div");
+  card.className = "pCard clickable draggable";
+  card.dataset.pid = p.id;
+  card.draggable = true;
 
-function collectModalLanes() {
-  return modalLaneChecks()
-    .filter((checkbox) => checkbox.checked)
-    .map((checkbox) => checkbox.value);
-}
-
-if (addParticipantBtn) {
-  addParticipantBtn.addEventListener("click", () => openPlayerModal({ mode: "create" }));
-}
-
-if (playerModalClose) {
-  playerModalClose.addEventListener("click", closePlayerModal);
-}
-
-if (playerModal) {
-  playerModal.addEventListener("click", (event) => {
-    if (event.target === playerModal) closePlayerModal();
+  card.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", p.id);
+    e.dataTransfer.effectAllowed = "move";
   });
-}
 
-if (playerModalSave) {
-  playerModalSave.addEventListener("click", () => {
-    const name = modalName?.value.trim();
-    if (!name) {
-      alert("Name is required.");
-      modalName?.focus();
-      return;
-    }
-
-    const tier = modalTier?.value || "UNRANKED";
-    const lanes = collectModalLanes();
-
-    if (editingPlayerId) {
-      const player = getPlayer(editingPlayerId);
-      if (player) {
-        player.name = name;
-        player.tier = tier;
-        player.lanes = lanes;
-      }
-    } else {
-      const newId = `p${players.length + 1}_${Math.random().toString(16).slice(2, 6)}`;
-      players.push({ id: newId, name, tier, lanes });
-    }
-
-    closePlayerModal();
-    rerenderAll();
+  // 클릭 픽은 Draft ON일 때만
+  card.addEventListener("click", () => {
+    if (!state.draft.active) return;
+    const teamId = getActiveTeamId();
+    if (!teamId) return;
+    const didPick = pickToFirstEmptySlot(p.id, teamId);
+    if (!didPick) return;
+    state.draft.turn += 1;
+    render();
   });
+
+  const left = document.createElement("div");
+  left.className = "pLeft";
+  left.appendChild(avatarEl(p.name));
+
+  const meta = document.createElement("div");
+  meta.className = "pMeta";
+
+  const name = document.createElement("div");
+  name.className = "pName";
+  name.textContent = p.name;
+
+  const sub = document.createElement("div");
+  sub.className = "pSub";
+  sub.textContent = lanesToText(p.lanes);
+
+  meta.appendChild(name);
+  meta.appendChild(sub);
+  left.appendChild(meta);
+
+  const right = document.createElement("div");
+  right.style.display = "flex";
+  right.style.alignItems = "center";
+  right.style.gap = "8px";
+
+  const badge = document.createElement("div");
+  badge.className = `badge ${tierClass(p.tier)}`;
+  badge.textContent = p.tier;
+
+  // ✅ participant에서도 remove (작은 x)
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "xBtn";
+  removeBtn.type = "button";
+  removeBtn.textContent = "✕";
+  removeBtn.title = "Remove participant";
+  removeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    removeParticipant(p.id);
+    render();
+  });
+
+  // ✅ 항상 EDIT
+  const editBtn = document.createElement("button");
+  editBtn.className = "miniBtn";
+  editBtn.type = "button";
+  editBtn.textContent = "Edit";
+  editBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openEditModal(p.id);
+  });
+
+  right.appendChild(badge);
+  right.appendChild(editBtn);
+  right.appendChild(removeBtn);
+
+  card.appendChild(left);
+  card.appendChild(right);
+  return card;
 }
 
-window.addEventListener("keydown", (event) => {
-  if (!playerModal) return;
-  if (event.key === "Escape" && playerModal.classList.contains("open")) closePlayerModal();
+function teamCard(team, activeTeamId) {
+  const captain = getParticipant(team.captainId);
+
+  const card = document.createElement("div");
+  card.className = "teamCard";
+  if (state.draft.active && team.id === activeTeamId) card.classList.add("activePick");
+
+  const header = document.createElement("div");
+  header.className = "teamHeader";
+
+  const left = document.createElement("div");
+  left.className = "teamHeaderLeft";
+  left.appendChild(avatarEl(captain?.name ?? "Captain"));
+
+  const meta = document.createElement("div");
+  meta.className = "pMeta";
+
+  const name = document.createElement("div");
+  name.className = "pName";
+  name.textContent = captain?.name ?? "Unknown";
+
+  const sub = document.createElement("div");
+  sub.className = "pSub";
+  sub.textContent = captain ? lanesToText(captain.lanes) : "";
+
+  meta.appendChild(name);
+  meta.appendChild(sub);
+  left.appendChild(meta);
+
+  const right = document.createElement("div");
+  right.className = "teamHeaderRight";
+
+  const tierBadge = document.createElement("div");
+  tierBadge.className = `badge ${tierClass(captain?.tier)}`;
+  tierBadge.textContent = captain?.tier ?? "";
+
+  const editCaptainBtn = document.createElement("button");
+  editCaptainBtn.className = "miniBtn";
+  editCaptainBtn.type = "button";
+  editCaptainBtn.textContent = "Edit";
+  editCaptainBtn.addEventListener("click", () => {
+    if (captain) openEditModal(captain.id);
+  });
+
+  const removeTeamBtn = document.createElement("button");
+  removeTeamBtn.className = "xBtn";
+  removeTeamBtn.type = "button";
+  removeTeamBtn.textContent = "✕";
+  removeTeamBtn.title = "Remove team";
+  removeTeamBtn.addEventListener("click", () => {
+    removeTeam(team.id);
+    render();
+  });
+
+  right.appendChild(tierBadge);
+  right.appendChild(editCaptainBtn);
+  right.appendChild(removeTeamBtn);
+
+  header.appendChild(left);
+  header.appendChild(right);
+
+  const slotsWrap = document.createElement("div");
+  slotsWrap.className = "teamSlots";
+
+  for (let i = 0; i < team.slots.length; i++) {
+    slotsWrap.appendChild(slotEl(team.id, i, team.slots[i]));
+  }
+
+  card.appendChild(header);
+  card.appendChild(slotsWrap);
+  return card;
+}
+
+function slotEl(teamId, slotIndex, pidOrNull) {
+  const slot = document.createElement("div");
+  slot.className = "slot";
+
+  const left = document.createElement("div");
+  left.className = "slotLeft";
+
+  const icon = document.createElement("div");
+  icon.className = "slotIcon";
+  icon.textContent = "👤";
+  left.appendChild(icon);
+
+  const text = document.createElement("div");
+  text.className = "slotText";
+
+  const name = document.createElement("div");
+  name.className = "slotName";
+
+  const sub = document.createElement("div");
+  sub.className = "slotSub";
+
+  const right = document.createElement("div");
+  right.className = "slotRight";
+
+  if (pidOrNull) {
+    const p = getParticipant(pidOrNull);
+
+    name.textContent = p?.name ?? "Unknown";
+    // ✅ 이름 아래는 라인만
+    sub.textContent = lanesToText(p?.lanes);
+
+    const badge = document.createElement("div");
+    badge.className = `badge ${tierClass(p?.tier)}`;
+    badge.textContent = p?.tier ?? "";
+    right.appendChild(badge);
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "miniBtn";
+    editBtn.type = "button";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => openEditModal(pidOrNull));
+    right.appendChild(editBtn);
+
+    const x = document.createElement("button");
+    x.className = "xBtn";
+    x.type = "button";
+    x.textContent = "✕";
+    x.title = "Remove member";
+    x.addEventListener("click", () => {
+      clearSlot(teamId, slotIndex);
+      render();
+    });
+    right.appendChild(x);
+  } else {
+    name.textContent = "Empty";
+    sub.textContent = "—";
+  }
+
+  text.appendChild(name);
+  text.appendChild(sub);
+  left.appendChild(text);
+
+  slot.appendChild(left);
+  slot.appendChild(right);
+
+  // Draft ON일 때만 drop 허용
+  if (state.draft.active) {
+    slot.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      slot.classList.add("dragOver");
+      e.dataTransfer.dropEffect = "move";
+    });
+    slot.addEventListener("dragleave", () => slot.classList.remove("dragOver"));
+    slot.addEventListener("drop", (e) => {
+      e.preventDefault();
+      slot.classList.remove("dragOver");
+
+      const payload = e.dataTransfer.getData("text/plain");
+      if (!payload || payload.startsWith("order:")) return;
+
+      const pid = payload;
+      if (isPicked(pid)) return;
+
+      const ok = assignToSpecificSlot(pid, teamId, slotIndex);
+      if (!ok) return;
+
+      state.draft.turn += 1;
+      render();
+    });
+  }
+
+  return slot;
+}
+
+function pickRow(team, activeTeamId) {
+  const captain = getParticipant(team.captainId);
+
+  const row = document.createElement("div");
+  row.className = "pCard draggable";
+  row.draggable = true;
+  row.dataset.teamid = team.id;
+
+  if (state.draft.active && team.id === activeTeamId) row.classList.add("activePick");
+
+  row.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", `order:${team.id}`);
+    e.dataTransfer.effectAllowed = "move";
+  });
+
+  row.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  });
+
+  row.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const payload = e.dataTransfer.getData("text/plain");
+    if (!payload?.startsWith("order:")) return;
+
+    const draggedTeamId = payload.split(":")[1];
+    const targetTeamId = row.dataset.teamid;
+    if (!draggedTeamId || !targetTeamId || draggedTeamId === targetTeamId) return;
+
+    reorderTeamOrder(draggedTeamId, targetTeamId);
+    render();
+  });
+
+  const left = document.createElement("div");
+  left.className = "pLeft";
+  left.appendChild(avatarEl(captain?.name ?? "C"));
+
+  const meta = document.createElement("div");
+  meta.className = "pMeta";
+
+  const name = document.createElement("div");
+  name.className = "pName";
+  name.textContent = captain?.name ?? "Unknown";
+
+  meta.appendChild(name);
+  left.appendChild(meta);
+
+  const right = document.createElement("div");
+  right.style.display = "flex";
+  right.style.alignItems = "center";
+  right.style.gap = "8px";
+
+  // ✅ Pick order에서도 EDIT 가능(팀장 편집)
+  const editBtn = document.createElement("button");
+  editBtn.className = "miniBtn";
+  editBtn.type = "button";
+  editBtn.textContent = "Edit";
+  editBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (captain) openEditModal(captain.id);
+  });
+  right.appendChild(editBtn);
+
+  row.appendChild(left);
+  row.appendChild(right);
+  return row;
+}
+
+// =====================
+// Operations
+// =====================
+function removeParticipant(pid) {
+  // participants list에는 원래 isPicked가 없는 사람만 나오지만, 안전 체크
+  if (isPicked(pid)) return;
+  state.participants = state.participants.filter(p => p.id !== pid);
+}
+
+function createTeamWithCaptain(captainId) {
+  if (isPicked(captainId)) return;
+  const team = { id: uid(), captainId, slots: [null, null, null, null] };
+  state.teams.push(team);
+  state.teamOrder.push(team.id);
+}
+
+function removeTeam(teamId) {
+  const idx = state.teams.findIndex(t => t.id === teamId);
+  if (idx === -1) return;
+
+  state.teams.splice(idx, 1);
+  state.teamOrder = state.teamOrder.filter(id => id !== teamId);
+
+  if (state.draft.active) {
+    state.draft.turn = 0;
+    if (state.teamOrder.length === 0) setDraftActive(false);
+  }
+}
+
+function reorderTeamOrder(draggedTeamId, targetTeamId) {
+  const arr = [...state.teamOrder];
+  const from = arr.indexOf(draggedTeamId);
+  const to = arr.indexOf(targetTeamId);
+  if (from === -1 || to === -1) return;
+
+  arr.splice(from, 1);
+  arr.splice(to, 0, draggedTeamId);
+  state.teamOrder = arr;
+  if (state.draft.active) state.draft.turn = 0;
+}
+
+function clearSlot(teamId, slotIndex) {
+  const team = state.teams.find(t => t.id === teamId);
+  if (!team) return;
+  team.slots[slotIndex] = null;
+}
+
+function pickToFirstEmptySlot(pid, teamId) {
+  const team = state.teams.find(t => t.id === teamId);
+  if (!team) return false;
+  if (isPicked(pid)) return false;
+
+  const empty = team.slots.findIndex(x => x === null);
+  if (empty === -1) return false;
+
+  team.slots[empty] = pid;
+  return true;
+}
+
+function assignToSpecificSlot(pid, teamId, slotIndex) {
+  const team = state.teams.find(t => t.id === teamId);
+  if (!team) return false;
+  if (isPicked(pid)) return false;
+  if (team.slots[slotIndex] !== null) return false;
+
+  team.slots[slotIndex] = pid;
+  return true;
+}
+
+// =====================
+// Captain drop zone
+// =====================
+captainDropZone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  captainDropZone.classList.add("dragOver");
+});
+captainDropZone.addEventListener("dragleave", () => captainDropZone.classList.remove("dragOver"));
+captainDropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  captainDropZone.classList.remove("dragOver");
+
+  const pid = e.dataTransfer.getData("text/plain");
+  if (!pid || pid.startsWith("order:")) return;
+  if (isPicked(pid)) return;
+
+  createTeamWithCaptain(pid);
+  render();
 });
 
-function rerenderAll() {
-  renderUndrafted();
-  renderTeams();
-  renderPickOrder();
+// =====================
+// Paste zone
+// =====================
+pasteZone.addEventListener("paste", (e) => {
+  const text = e.clipboardData?.getData("text/plain") ?? "";
+  if (!text) return;
+  e.preventDefault();
 
-  if (statusText) {
-    const usedCount = teams.reduce((sum, team) => sum + (team.captainId ? 1 : 0) + team.memberIds.length, 0);
-    const undraftedCount = players.length - usedCount;
-    statusText.textContent = `Ready · ${teams.length} teams · ${players.length} players · ${undraftedCount} undrafted`;
+  const created = parsePasteText(text);
+  if (created.length === 0) return;
+
+  const existingNames = new Set(state.participants.map(p => p.name.trim()));
+  const unique = created.filter(p => !existingNames.has(p.name.trim()));
+
+  state.participants.unshift(...unique);
+  render();
+});
+
+// =====================
+// Copy Korean result
+// =====================
+btnCopyKorean?.addEventListener("click", async () => {
+  const blocks = [];
+
+  const teams = state.teamOrder.map(id => state.teams.find(t => t.id === id)).filter(Boolean);
+  for (let i = 0; i < teams.length; i++) {
+    const t = teams[i];
+    blocks.push(`팀${i + 1}`);
+
+    const captain = getParticipant(t.captainId);
+    if (captain) {
+      blocks.push(`${captain.name}/${tierToKorean(captain.tier)}/${lanesToKoreanText(captain.lanes)}`);
+
+    }
+
+    for (const pid of t.slots) {
+      if (!pid) continue;
+      const p = getParticipant(pid);
+      if (!p) continue;
+      blocks.push(`${p.name}/${tierToKorean(p.tier)}/${lanesToKoreanText(p.lanes)}`);
+
+    }
+
+    blocks.push(""); // blank line between teams
   }
+
+  const out = blocks.join("\n").trim() + "\n";
+  await copyToClipboard(out);
+});
+
+// =====================
+// Draft toggle
+// =====================
+btnToggleDraftTop.addEventListener("click", toggleDraft);
+btnToggleDraftBottom.addEventListener("click", toggleDraft);
+
+function toggleDraft() {
+  if (state.teamOrder.length === 0) return;
+  setDraftActive(!state.draft.active);
+  render();
 }
 
-rerenderAll();
+// =====================
+// Add modal
+// =====================
+btnOpenAdd.addEventListener("click", openAddModal);
+btnCloseAdd.addEventListener("click", closeAddModal);
+btnCancelAdd.addEventListener("click", closeAddModal);
+modalBackdrop.addEventListener("click", (e) => {
+  if (e.target === modalBackdrop) closeAddModal();
+});
+
+addForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+
+  const name = inpName.value.trim();
+  const tier = inpTier.value;
+
+  const lanes = Array.from(laneGrid.querySelectorAll('input[type="checkbox"]'))
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+
+  if (!name || !tier || lanes.length === 0) return;
+
+  state.participants.unshift({ id: uid(), name, lanes, tier });
+  addForm.reset();
+  closeAddModal();
+  render();
+});
+
+function openAddModal() {
+  modalBackdrop.classList.remove("hidden");
+  setTimeout(() => inpName.focus(), 0);
+}
+function closeAddModal() {
+  modalBackdrop.classList.add("hidden");
+}
+
+// =====================
+// Global Edit Modal (injected)
+// =====================
+let editBackdrop = null;
+
+function openEditModal(pid) {
+  const p = getParticipant(pid);
+  if (!p) return;
+
+  if (!editBackdrop) {
+    editBackdrop = document.createElement("div");
+    editBackdrop.className = "modalBackdrop";
+    editBackdrop.style.display = "none";
+    editBackdrop.innerHTML = `
+      <div class="modal">
+        <div class="modalHeader">
+          <div class="modalTitle">Edit Participant</div>
+          <button id="btnCloseEdit" class="iconBtn" aria-label="Close">✕</button>
+        </div>
+
+        <form id="editForm" class="form">
+          <label class="field">
+            <span>Nickname</span>
+            <input id="editName" type="text" required />
+          </label>
+
+          <div class="field">
+            <span>Lanes (multi-select)</span>
+            <div class="laneGrid" id="editLaneGrid">
+              <label class="laneOpt"><input type="checkbox" value="TOP" /> TOP</label>
+              <label class="laneOpt"><input type="checkbox" value="JGL" /> JGL</label>
+              <label class="laneOpt"><input type="checkbox" value="MID" /> MID</label>
+              <label class="laneOpt"><input type="checkbox" value="ADC" /> ADC</label>
+              <label class="laneOpt"><input type="checkbox" value="SUP" /> SUP</label>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Tier</span>
+            <select id="editTier" required>
+              <option>Iron</option>
+              <option>Bronze</option>
+              <option>Silver</option>
+              <option>Gold</option>
+              <option>Platinum</option>
+              <option>Emerald</option>
+              <option>Diamond</option>
+              <option>Master</option>
+              <option>Grandmaster</option>
+              <option>Challenger</option>
+            </select>
+          </label>
+
+          <div class="formActions">
+            <button type="button" id="btnCancelEdit" class="secondaryBtn">Cancel</button>
+            <button type="submit" class="primaryBtn">Save</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(editBackdrop);
+
+    editBackdrop.addEventListener("click", (e) => {
+      if (e.target === editBackdrop) closeEditModal();
+    });
+
+    editBackdrop.querySelector("#btnCloseEdit").addEventListener("click", closeEditModal);
+    editBackdrop.querySelector("#btnCancelEdit").addEventListener("click", closeEditModal);
+
+    editBackdrop.querySelector("#editForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const pid = editBackdrop.dataset.pid;
+      const p = getParticipant(pid);
+      if (!p) return;
+
+      const newName = editBackdrop.querySelector("#editName").value.trim();
+      const newTier = editBackdrop.querySelector("#editTier").value;
+
+      const newLanes = Array.from(editBackdrop.querySelectorAll('#editLaneGrid input[type="checkbox"]'))
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+
+      if (!newName || !newTier || newLanes.length === 0) return;
+
+      p.name = newName;
+      p.tier = newTier;
+      p.lanes = newLanes;
+
+      closeEditModal();
+      render();
+    });
+  }
+
+  editBackdrop.dataset.pid = pid;
+  editBackdrop.querySelector("#editName").value = p.name;
+  editBackdrop.querySelector("#editTier").value = normalizeTier(p.tier);
+
+  for (const cb of editBackdrop.querySelectorAll('#editLaneGrid input[type="checkbox"]')) {
+    cb.checked = Array.isArray(p.lanes) && p.lanes.includes(cb.value);
+  }
+
+  editBackdrop.style.display = "flex";
+}
+
+function closeEditModal() {
+  if (!editBackdrop) return;
+  editBackdrop.style.display = "none";
+}
+
+// =====================
+// Init
+// =====================
+setDraftActive(false);
+render();
