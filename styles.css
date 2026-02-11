@@ -531,3 +531,62 @@ button:hover {
   color: #fff;
   cursor: pointer;
 }
+
+/* --- team card sizing + fixed 5-slot layout (captain 1 + members 4) --- */
+.team-card {
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.members-list {
+  display: grid;
+  grid-template-rows: repeat(4, minmax(72px, auto));
+  gap: 8px;
+}
+
+.member-slot {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  min-height: 72px;
+}
+
+.member-slot .player-card {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.member-slot.is-empty {
+  border: 1px dashed #e5e7eb;
+  background: #fafafa;
+  color: #94a3b8;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* captain drop box always visible */
+.captain-slot {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.captain-slot.is-empty {
+  border: 2px dashed #cbd5e1;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* drag feedback */
+.player-card.dragging {
+  opacity: 0.55;
+}
+
+.captain-slot.drop-active,
+.member-slot.drop-active {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
