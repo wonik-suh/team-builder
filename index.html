@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Draft Board</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="brand">Draft Board</div>
+    <div class="status" id="statusText">Setup</div>
+  </header>
+
+  <!-- Main Layout -->
+  <main class="layout">
+
+    <!-- LEFT: Participants -->
+    <aside class="panel left" aria-label="Participants">
+
+      <!-- Add Participant -->
+      <section class="panel-section add">
+        <div class="panel-header">
+            <h2>Add Participant</h2>
+            <button
+            id="addParticipantBtn"
+            class="icon-btn"
+            type="button"
+            aria-label="Add participant"
+            >
+            +
+            </button>
+        </div>
+      </section>
+
+      <!-- Undrafted -->
+      <section class="panel-section undrafted">
+        <h2>Undrafted</h2>
+        <div id="undraftedList">
+          <!-- Player cards go here -->
+        </div>
+      </section>
+
+    </aside>
+
+    <!-- CENTER: Teams -->
+    <section class="panel center" aria-label="Teams">
+
+      <div class="center-header">
+        <h2>Teams</h2>
+        <p>Drop a player into a Captain slot to create a team.</p>
+      </div>
+
+      <div id="teamsGrid">
+        <!-- Team cards injected here -->
+      </div>
+
+      <div id="teamsEmpty">
+        No teams yet.
+      </div>
+
+    </section>
+
+    <!-- RIGHT: Draft Settings -->
+    <aside class="panel right" aria-label="Draft Settings">
+
+      <section class="panel-section settings">
+        <h2>Draft Settings</h2>
+
+        <div class="actions">
+          <button id="startDraftBtn">Start Draft</button>
+          <button id="postBtn">Post to Discord</button>
+        </div>
+
+        <div class="field">
+          <label>Draft Mode</label>
+          <div>
+            <label><input type="radio" name="mode" checked> Captains</label>
+            <label><input type="radio" name="mode"> Snake</label>
+            <label><input type="radio" name="mode"> Random</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Pick Order</label>
+          <div id="pickOrderList">
+            <!-- Team order goes here -->
+          </div>
+        </div>
+
+      </section>
+
+    </aside>
+
+  </main>
+
+  <!-- Player Card Template -->
+  <template id="playerCardTpl">
+  <div class="player-card" draggable="true">
+    <div class="avatar">👤</div>
+
+    <div class="info">
+      <div class="row">
+        <span class="name">Player</span>
+        <button class="edit">✏️</button>
+      </div>
+      <div class="subrow">
+        <span class="lanes">ALL</span>
+      </div>
+    </div>
+
+    <div class="tier-badge">Gold</div>
+  </div>
+</template>
+
+  <!-- Team Card Template -->
+  <template id="teamCardTpl">
+  <section class="team-card">
+    <button class="team-remove" aria-label="Remove team">✕</button>
+
+    <div class="captain-wrap">
+      <div class="captain-slot"></div>
+    </div>
+
+    <div class="members">
+      <div class="members-list"></div>
+      <div class="member-dropzone">Drop member</div>
+    </div>
+  </section>
+</template>
+
+  <!-- Edit Player Modal -->
+  <div id="editModal" hidden>
+    <div class="modal">
+      <h3>Edit Player</h3>
+
+      <label>
+        Name
+        <input id="editName" />
+      </label>
+
+      <label>
+        Tier
+        <select id="editTier"></select>
+      </label>
+
+      <div>
+        Lanes (none or all = ALL)
+      </div>
+
+      <div class="modal-actions">
+        <button id="cancelEditBtn">Cancel</button>
+        <button id="saveEditBtn">Save</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Player Modal -->
+<div id="playerModal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="playerModalTitle">
+    <div class="modal-header">
+      <h3 id="playerModalTitle">Player</h3>
+      <button id="playerModalClose" class="icon-btn subtle" type="button" aria-label="Close">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <label class="field">
+        <span>Name</span>
+        <input id="modalName" type="text" placeholder="e.g. Faker" />
+      </label>
+
+      <label class="field">
+        <span>Rank</span>
+        <select id="modalTier">
+          <option>UNRANKED</option>
+          <option>Iron</option>
+          <option>Bronze</option>
+          <option>Silver</option>
+          <option>Gold</option>
+          <option>Platinum</option>
+          <option>Emerald</option>
+          <option>Diamond</option>
+          <option>Master</option>
+          <option>Grandmaster</option>
+          <option>Challenger</option>
+        </select>
+      </label>
+
+      <div class="field">
+        <span>Lines (multi)</span>
+        <div class="checks">
+          <label><input type="checkbox" value="Top" /> TOP</label>
+          <label><input type="checkbox" value="Jungle" /> JGL</label>
+          <label><input type="checkbox" value="Mid" /> MID</label>
+          <label><input type="checkbox" value="ADC" /> ADC</label>
+          <label><input type="checkbox" value="Support" /> SUP</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button id="playerModalSave" class="btn primary" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

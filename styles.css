@@ -1,0 +1,533 @@
+/* --- base --- */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+h2 { margin: 0 0 10px; font-size: 16px; }
+p { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
+
+/* --- topbar --- */
+.topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+}
+.brand { font-weight: 700; }
+.status { font-size: 12px; color: #6b7280; }
+
+/* --- 3-column layout --- */
+.layout {
+  height: calc(100vh - 56px);
+  display: grid;
+  grid-template-columns: 360px 1fr 320px;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* --- panels --- */
+.panel {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden; /* keeps inner scroll clean */
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* important for grid overflow */
+}
+
+.panel-section {
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.panel-section:last-child {
+  border-bottom: 0;
+}
+
+/* left */
+.left .undrafted {
+  flex: 1;
+  min-height: 0;
+}
+
+/* center */
+.center .center-header {
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.center #teamsGrid {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+.center #teamsEmpty {
+  padding: 12px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+/* right */
+.right .settings {
+  flex: 1;
+  min-height: 0;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.actions button {
+  flex: 1;
+}
+
+/* form basics */
+input, select, button {
+  font: inherit;
+}
+#addForm input, #addForm select {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+}
+#addLanes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+button {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+button:hover {
+  background: #f9fafb;
+}
+
+/* lists (undrafted) */
+#undraftedList {
+  overflow: auto;
+  max-height: 100%;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 10px;
+}
+
+/* just for visibility right now */
+.field { margin-top: 12px; }
+.field label { display: block; font-size: 12px; color: #374151; margin-bottom: 6px; }
+/* player card basics */
+.player-card {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  margin-bottom: 8px;
+}
+
+/* avatar placeholder */
+.player-card .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* info block */
+.player-card .info {
+  flex: 1;
+  min-width: 0; /* 중요: 텍스트 넘침 제어 */
+}
+
+.player-card .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.player-card .name {
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* tags */
+.player-card .tags {
+  margin-top: 4px;
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.player-card .tier,
+.player-card .lanes {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  white-space: nowrap;      /* 한 줄 고정 */
+  overflow: hidden;
+  text-overflow: ellipsis;  /* 길면 ... */
+}
+/* --- teams grid layout --- */
+#teamsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+/* --- team card --- */
+.team-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.team-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.team-card header strong {
+  font-size: 14px;
+}
+
+.team-card header button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+/* --- captain slot --- */
+.captain-slot {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #f8fafc;
+  min-height: 64px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* when captain slot contains a player-card, make it full width */
+.captain-slot .player-card {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+/* --- members list (4x1) --- */
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+.member-slot {
+  border: 1px dashed #e5e7eb;
+  border-radius: 12px;
+  padding: 8px;
+  background: #ffffff;
+  min-height: 64px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* if slot contains a player card, let it fill */
+.member-slot .player-card {
+  width: 100%;
+  margin-bottom: 0;
+}
+/* --- members list (4x1) --- */
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.player-card {
+  align-items: center;
+}
+
+.player-card .info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-card .subrow {
+  margin-top: 4px;
+}
+
+.tier-badge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  white-space: nowrap;
+  margin-left: 10px;
+}
+/* =========================
+   Team: captain slot becomes the captain "card"
+   Dashed border ONLY when empty
+========================= */
+
+.team-card {
+  position: relative;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* subtle X */
+.team-remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: #9ca3af;
+  cursor: pointer;
+}
+.team-remove:hover { color: #374151; }
+
+/* captain area background should NOT be the "strong" highlight */
+.captain-wrap {
+  background: #f3f4f6;          /* 은은한 회색만 */
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* captain slot becomes the visual container */
+.captain-slot {
+  border: none;                 /* 기본: 테두리 없음 */
+  border-radius: 12px;
+  padding: 10px;                /* 슬롯 자체가 카드가 되게 */
+  background: #ffffff;
+}
+
+/* ONLY empty captain slot shows dashed */
+.captain-slot.is-empty {
+  border: 2px dashed #cbd5e1;
+  background: #ffffff;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* captain player-card should "melt into" the slot */
+.captain-slot .player-card {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+/* members list */
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+/* member slots: no extra framing when filled */
+.member-slot {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+/* empty member slots show dashed drop box */
+.member-slot.is-empty {
+  border: 1px dashed #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafafa;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* IMPORTANT: fix "faded" cards caused by inherited gray color from parent */
+.player-card {
+  color: #111827;
+}
+.player-card .name {
+  color: #111827;
+}
+/* members area: list + single dropzone */
+.members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* each member row holds a full card */
+.member-row .player-card {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+/* single dropzone at bottom */
+.member-dropzone {
+  border: 1px dashed #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafafa;
+  color: #94a3b8;
+  font-size: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* panel header with + button */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.icon-btn.subtle {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+}
+.icon-btn.subtle:hover { color: #374151; }
+
+/* modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.35);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 9999;
+}
+
+.modal-backdrop.open {
+  display: flex;
+}
+
+.modal {
+  width: min(520px, 100%);
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field span {
+  display: block;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  outline: none;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  font-size: 12px;
+  color: #111827;
+}
+
+.modal-footer {
+  padding: 14px 16px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn.primary {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+}
