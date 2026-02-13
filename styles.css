@@ -464,3 +464,8 @@ body{
   background: rgba(35,165,89,.18);
   border-color: rgba(35,165,89,.7);
 }
+/* Draft에서 "취소 가능한 X"는 항상 빨간 테두리 */
+.xBtn.xUndo{
+  border-color: rgba(237,66,69,.95);
+  box-shadow: 0 0 0 2px rgba(237,66,69,.22);
+}

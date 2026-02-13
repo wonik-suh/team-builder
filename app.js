@@ -639,6 +639,7 @@ function slotEl(teamId, slotIndex, pidOrNull) {
 
     const x = document.createElement("button");
     x.className = "xBtn";
+    x.classList.add("xUndo"); // ✅ 취소 가능한 X 강조
     x.type = "button";
     x.textContent = "✕";
     x.title = "Undo last pick";
