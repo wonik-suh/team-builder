@@ -213,6 +213,8 @@ const state = {
   draft: {
     active: false,
     turn: 0,
+    history: [],        // ✅ undo 스택 (draft 중 픽 하드락)
+    lastPickedPid: null // ✅ 마지막으로 픽된 플레이어 pid
   }
 };
 
@@ -274,13 +276,39 @@ function getActiveTeamId() {
   const idx = seq[state.draft.turn % seq.length];
   return state.teamOrder[idx];
 }
+function getHighlightPickCount() {
+  if (!state.draft.active) return 0;
+
+  const n = state.teamOrder.length;
+  if (n === 0) return 0;
+
+  const seq = buildSnakeSeq(n);
+  const len = seq.length;
+
+  const curIdx = seq[state.draft.turn % len];
+  const nextIdx = seq[(state.draft.turn + 1) % len];
+
+  // 같은 팀이 연속으로 픽하는 구간이면 2칸 하이라이트
+  return curIdx === nextIdx ? 2 : 1;
+}
+
 
 // =====================
 // Draft toggle + auto-end
 // =====================
 function setDraftActive(on) {
   state.draft.active = on;
-  if (on) state.draft.turn = 0;
+
+  if (on) {
+    state.draft.turn = 0;
+    // ✅ 하드락 undo를 위한 스냅샷 스택 초기화
+    state.draft.history = [];
+    state.draft.lastPickedPid = null;
+  } else {
+    // draft 종료 시 안전하게 초기화
+    state.draft.history = [];
+    state.draft.lastPickedPid = null;
+  }
 
   btnToggleDraftTop.textContent = on ? "End Draft" : "Start Draft";
   btnToggleDraftBottom.textContent = on ? "End Draft" : "Start Draft";
@@ -289,7 +317,12 @@ function setDraftActive(on) {
 
 function maybeAutoEndDraft() {
   if (!state.draft.active) return;
-  if (allSlotsFilled()) setDraftActive(false);
+  if (allSlotsFilled()) {
+    setDraftActive(false);
+    // 이미 setDraftActive(false)에서 history/lastPickedPid 정리하지만, 명시적으로 한 번 더
+    state.draft.history = [];
+    state.draft.lastPickedPid = null;
+  }
 }
 
 // =====================
@@ -382,8 +415,20 @@ function participantCard(p) {
     if (!state.draft.active) return;
     const teamId = getActiveTeamId();
     if (!teamId) return;
+
+    // ✅ 픽 직전 상태 저장 (undo 하드락)
+    pushDraftSnapshot();
+
     const didPick = pickToFirstEmptySlot(p.id, teamId);
-    if (!didPick) return;
+    if (!didPick) {
+      // 실패하면 방금 저장한 스냅샷 제거
+      state.draft.history.pop();
+      return;
+    }
+
+    // ✅ 마지막 픽 기록
+    state.draft.lastPickedPid = p.id;
+
     state.draft.turn += 1;
     render();
   });
@@ -543,6 +588,31 @@ function slotEl(teamId, slotIndex, pidOrNull) {
 
   const right = document.createElement("div");
   right.className = "slotRight";
+  // ✅ 현재 턴에서 뽑아야 할 슬롯 하이라이트
+  if (state.draft.active) {
+  const activeTeamId = getActiveTeamId();
+
+  if (teamId === activeTeamId && pidOrNull === null) {
+    const team = state.teams.find(t => t.id === teamId);
+    if (team) {
+      const k = getHighlightPickCount(); // 1 또는 2
+
+      // 빈 슬롯 index들
+      const emptyIdxs = [];
+      for (let i = 0; i < team.slots.length; i++) {
+        if (team.slots[i] === null) emptyIdxs.push(i);
+      }
+
+      // 이번 턴에 하이라이트할 슬롯들(첫 k개)
+      const toHighlight = emptyIdxs.slice(0, k);
+      if (toHighlight.includes(slotIndex)) {
+        slot.classList.add("nextPickSlot");
+      }
+    }
+  }
+}
+
+
 
   if (pidOrNull) {
     const p = getParticipant(pidOrNull);
@@ -562,17 +632,35 @@ function slotEl(teamId, slotIndex, pidOrNull) {
     editBtn.textContent = "Edit";
     editBtn.addEventListener("click", () => openEditModal(pidOrNull));
     right.appendChild(editBtn);
+    
+
+// ✅ Draft ON일 때는 "마지막 픽"만 취소 가능
+  if (!state.draft.active || state.draft.lastPickedPid === pidOrNull) {
 
     const x = document.createElement("button");
     x.className = "xBtn";
     x.type = "button";
     x.textContent = "✕";
-    x.title = "Remove member";
+    x.title = "Undo last pick";
+
     x.addEventListener("click", () => {
-      clearSlot(teamId, slotIndex);
+
+      if (state.draft.active) {
+      // Draft ON → undo 방식만 허용
+        const ok = undoLastPick();
+        if (!ok) return;
+      }   else {
+      // Draft OFF → 자유 삭제
+        clearSlot(teamId, slotIndex);
+      }
+
       render();
     });
-    right.appendChild(x);
+
+  right.appendChild(x);
+  
+}
+
   } else {
     name.textContent = "Empty";
     sub.textContent = "—";
@@ -603,8 +691,17 @@ function slotEl(teamId, slotIndex, pidOrNull) {
       const pid = payload;
       if (isPicked(pid)) return;
 
+      // ✅ 픽 직전 상태 저장 (undo 하드락)
+      pushDraftSnapshot();
+
       const ok = assignToSpecificSlot(pid, teamId, slotIndex);
-      if (!ok) return;
+      if (!ok) {
+        state.draft.history.pop();
+        return;
+      }
+
+      // ✅ 마지막 픽 기록
+      state.draft.lastPickedPid = pid;
 
       state.draft.turn += 1;
       render();
@@ -680,6 +777,39 @@ function pickRow(team, activeTeamId) {
   row.appendChild(left);
   row.appendChild(right);
   return row;
+}
+
+// =====================
+// Draft undo hardlock helpers
+// =====================
+function deepCloneTeams(teams) {
+  return teams.map(t => ({
+    id: t.id,
+    captainId: t.captainId,
+    slots: [...t.slots],
+  }));
+}
+
+// 픽 성공 직전에 호출: 되돌릴 수 있게 현재 상태를 스택에 저장
+function pushDraftSnapshot() {
+  if (!state.draft.active) return;
+  state.draft.history.push({
+    turn: state.draft.turn,
+    teams: deepCloneTeams(state.teams),
+    lastPickedPid: state.draft.lastPickedPid,
+  });
+}
+
+// 마지막 픽만 취소(undo) 가능: 스택에서 1개 pop해서 복원
+function undoLastPick() {
+  const snap = state.draft.history.pop();
+  if (!snap) return false;
+
+  state.draft.turn = snap.turn;
+  state.teams = snap.teams;
+  state.draft.lastPickedPid = snap.lastPickedPid;
+
+  return true;
 }
 
 // =====================

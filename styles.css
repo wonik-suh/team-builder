@@ -458,3 +458,9 @@ body{
   gap:10px;
   padding-top:6px;
 }
+/* 현재 턴에서 뽑아야 할 슬롯 */
+.nextPickSlot {
+  outline: 3px solid rgba(35,165,89,.8);
+  background: rgba(35,165,89,.18);
+  border-color: rgba(35,165,89,.7);
+}
