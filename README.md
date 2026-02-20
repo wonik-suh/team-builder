@@ -3,7 +3,7 @@
 A Discord-style web-based team draft tool for League of Legends custom games.  
 Built with vanilla HTML, CSS, and JavaScript.
 
-Live Demo: (https://github.com/wonik-suh/team-builder)
+Live Demo: (https://wonik-suh.github.io/team-builder/)
 
 ---
 
