@@ -140,7 +140,11 @@ function parsePasteText(text) {
   const created = [];
   for (const line of lines) {
     const parts = line.split("/").map(x => x.trim());
-    const name = parts[0] ?? "";
+
+    // ✅ 닉네임 앞 @ 제거
+    const rawName = parts[0] ?? "";
+    const name = rawName.replace(/^@+/, "").trim();
+
     const tierRaw = parts[1] ?? "";
     const laneRaw = parts[2] ?? "";
 
